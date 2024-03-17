@@ -69,9 +69,9 @@ void test_hbm_c2h(uint8_t pci_bus) {
         fpga_ctl->writeReg(13, 0);
     });
 
-    uint32_t total_cmds = 1024 * 1024;
-    uint32_t length = 64;
-    uint32_t total_words = length/64 * total_cmds;
+    uint32_t total_cmds = 1;
+    uint32_t total_words = 1024 * 1024;
+    uint32_t length = 64 * 1024 * 1024; 
     uint32_t wait_cycles = 50; //100=2.5Mops,when 4K burst, 100=10GB/s
     uint32_t total_qs = 1;
 
@@ -185,9 +185,10 @@ void test_hbm_h2c(uint8_t pci_bus){
         for (int j = 0; j < 8; j++)
             p_h2c[i*8+j] = offset + i*64 + j;
         }
-    uint32_t total_cmds = 1024 * 1024;
-    uint32_t length = 64;
-    uint32_t total_words = length/64 * total_cmds;
+    uint32_t total_cmds = 1;
+    uint32_t total_words = 1024 * 1024;
+    uint32_t length = 64 * 1024 * 1024; 
+    // 一个 word 64 byte, 512 bits
     uint32_t wait_cycles = 50; //100=2.5Mops,when 4K burst, 100=10GB/s
     uint32_t is_seq = 1;
     uint32_t total_qs = 1;

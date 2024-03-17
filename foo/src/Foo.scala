@@ -157,7 +157,7 @@ class Foo extends Module{
 	val cpu_started = reg_control(222)(0)
 	// riscv-mini
 	val config = MiniConfig()
-	val mini_core = withClockAndReset(io.sysClk, cpu_started.asBool) { 
+	val mini_core = withClockAndReset(hbm_clk, cpu_started.asBool) { 
 		Module(new Tile(
 		coreParams = config.core, 
 		nastiParams = config.nasti, 
@@ -165,7 +165,7 @@ class Foo extends Module{
 		))
 	}
 
-	val hbm_port = hbm_driver.io.axi_hbm(1)
+	val hbm_port = hbm_driver.io.axi_hbm(4)
 	hbm_port.ar <> mini_core.io.nasti.ar 
 	
 	mini_core.io.nasti.aw <> hbm_port.aw
@@ -181,7 +181,7 @@ class Foo extends Module{
 	// qdma_h2c_data.bits.data,
 	// qdma_h2c_data.bits.last,
 
-	// qdma_c2h_data.bits.data,
+	qdma_c2h_data.bits.data,
 	// qdma_c2h_data.bits.last,
 
 	// axi2hbm.io.hbmAxi.aw.bits.addr,
@@ -191,10 +191,10 @@ class Foo extends Module{
 	// axi2hbm.io.hbmAxi.b.valid,
 
 
-	// axi2hbm.io.hbmAxi.ar.bits.addr,
-	// axi2hbm.io.hbmAxi.ar.bits.len,
-	// axi2hbm.io.hbmAxi.r.bits.data,
-	// axi2hbm.io.hbmAxi.r.bits.last,
+	axi2hbm.io.hbmAxi.ar.bits.addr,
+	axi2hbm.io.hbmAxi.ar.bits.len,
+	axi2hbm.io.hbmAxi.r.bits.data,
+	axi2hbm.io.hbmAxi.r.bits.last,
 
 	)))
 	inst.connect(clock)

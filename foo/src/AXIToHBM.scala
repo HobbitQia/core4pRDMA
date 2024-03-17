@@ -198,7 +198,8 @@ class AXIToHBM() extends RawModule {
         }
         ctrlFifoR.io.in.valid   := ((StateR  === sWriteSecond)&& io.hbmAxi.r.fire)
         ctrlFifoR.io.in.bits.data    := Cat(io.hbmAxi.r.bits.data, rData_1)
-        ctrlFifoR.io.in.bits.last    := io.hbmAxi.r.bits.last
+        // ctrlFifoR.io.in.bits.last    := io.hbmAxi.r.bits.last
+        ctrlFifoR.io.in.bits.last    := (StateR === sWriteSecond) && io.hbmAxi.r.fire && (ctrlRLen <= 32.U)
 
         // AR
         switch(StateAr) {

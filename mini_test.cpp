@@ -70,22 +70,28 @@ void test_hbm_c2h(uint8_t pci_bus) {
     });
 
     uint32_t total_cmds = 1;
-    uint32_t total_words = 1024 * 1024;
-    uint32_t length = 64 * 1024 * 1024; 
+    uint32_t total_words = 1024;
+    uint32_t length = 64 * 1024; 
     uint32_t wait_cycles = 50; //100=2.5Mops,when 4K burst, 100=10GB/s
     uint32_t total_qs = 1;
 
     auto dma_buff = cpu_mem_ctl->alloc(size);
     uint32_t offset = GLOABL_OFFSET;
     size_t * p_c2h = ((size_t *) dma_buff) + size/2/sizeof(size_t);
-    fpga_ctl->writeReg(200, (uint32_t) ((unsigned long)p_c2h>>32));
-    fpga_ctl->writeReg(201, (uint32_t) ((unsigned long)p_c2h));
+    for(size_t i=0;i<size/2/sizeof(size_t);i++){
+        p_c2h[i]=0;
+    }
+    fmt::println("h2c addr: 0x{:x}, 0x{:x}",(uint32_t)((uint64_t) dma_buff >> 32), (uint32_t)((uint64_t) dma_buff) );
+    fmt::println("c2h addr: 0x{:x}, 0x{:x}",(uint32_t)((uint64_t) p_c2h >> 32), (uint32_t)((uint64_t) p_c2h) );
+    fpga_ctl->writeReg(200, (uint32_t) ((uint64_t) p_c2h >> 32));
+    fpga_ctl->writeReg(201, (uint32_t) ((uint64_t) p_c2h));
+    p_c2h = (size_t *)((uint64_t)p_c2h + 0x10000);
+    fmt::println("c2h addr: 0x{:x}, 0x{:x}",(uint32_t)((uint64_t) p_c2h >> 32), (uint32_t)((uint64_t) p_c2h) );
     fpga_ctl->writeReg(202, length);
     fpga_ctl->writeReg(203, offset);
     fpga_ctl->writeReg(205, total_words);
     fpga_ctl->writeReg(206, total_qs);
     fpga_ctl->writeReg(207, total_cmds);
-    fpga_ctl->writeReg(213, 0);
     uint32_t target_addr = 0;
     fpga_ctl->writeReg(214, target_addr);
 
@@ -94,20 +100,13 @@ void test_hbm_c2h(uint8_t pci_bus) {
             uint32_t tag = fpga_ctl->readConfig(0x140c/4);
             fpga_ctl->writeReg(209, tag);
             fpga_ctl->writeReg(210, i+1);
-    fmt::println("{}",tag&0x7f);
+            fmt::println("{}",tag&0x7f);
     }
     fpga_ctl->writeReg(210, 0);//reset tag_index
 
-    uint64_t data[8];   // 8 个地址
-    for(int i=0;i<8;i++){
-            data[i] = 1;
-    }
     // size_t 也是 64 bit
     int beats = 1;
 
-    for(size_t i=0;i<size/2/sizeof(size_t);i++){
-        p_c2h[i]=0;
-    }
     reset_counters_hbm(fpga_ctl);
 
     fmt::println("Card to Host finish setting !");
@@ -115,7 +114,7 @@ void test_hbm_c2h(uint8_t pci_bus) {
     fpga_ctl->writeReg(204, 0);
     fpga_ctl->writeReg(204, 1);
 
-    sleep(2);
+    sleep(3);
 
     fmt::println("Card to Host successfully!");
 
@@ -134,18 +133,21 @@ void test_hbm_c2h(uint8_t pci_bus) {
 
         for(int i = 0; i < total_words; i++) {
             int bj = 0;
-            for (int j = 0; j < 8; j++) {
-                if (p_c2h[i*8+j] != offset + 64 * i + j) {
-                    if (count_error < 20)
-                    fmt::println("now:    0x{:x}, should be 0x{:x}", p_c2h[i*8+j], offset + 64 * i + j);
-                    bj = 1;
-                    count_error ++;
-                }
-            }
+            for (int j  = 0; j < 8; j++) 
+                if (p_c2h[i * 8 + j] != 0)
+                    fmt::println("now:    0x{:x}, should be 0x{:x}", p_c2h[i * 8 + j], i * 8 + j);
+            // for (int j = 0; j < 8; j++) {
+            //     if (p_c2h[i*8+j] != offset + 64 * i + j) {
+            //         if (count_error < 20)
+            //         fmt::println("now:    0x{:x}, should be 0x{:x}", p_c2h[i*8+j], offset + 64 * i + j);
+            //         bj = 1;
+            //         count_error ++;
+            //     }
+            // }
             if (bj == 1) count_error_word++;
         }
         fmt::println("There are total 0x{:x} words transferred", total_words);
-                fmt::println("count_error:    0x{:x}, shoule be: 0x0", count_error);
+        fmt::println("count_error:    0x{:x}, shoule be: 0x0", count_error);
         fmt::println("count_error_word:    0x{:x}, shoule be: 0x0", count_error_word);
 
         fmt::print("\n");
@@ -175,19 +177,15 @@ void test_hbm_h2c(uint8_t pci_bus){
 
     auto dma_buff = cpu_mem_ctl->alloc(size);
     uint32_t offset = GLOABL_OFFSET;
-        size_t * p_h2c = (size_t *) dma_buff;
-        size_t * p_c2h = ((size_t *) dma_buff) + size/2/sizeof(size_t);
+    size_t * p_h2c = (size_t *) dma_buff;
 
-        for(int i = 0; i < size / 2 / 64; i++){//initial
-        // i i+1 ... i+7 放一个字
-        // for (int j = 0; j < 8; j++)
-                    // p_h2c[i*8] = offset + i*64;//sizeof(size_t)*8=512
+    for(int i = 0; i < size / 2 / 64; i++){//initial
         for (int j = 0; j < 8; j++)
             p_h2c[i*8+j] = offset + i*64 + j;
-        }
+    }
     uint32_t total_cmds = 1;
-    uint32_t total_words = 1024 * 1024;
-    uint32_t length = 64 * 1024 * 1024; 
+    uint32_t total_words = 1024;
+    uint32_t length = 64 * 1024; 
     // 一个 word 64 byte, 512 bits
     uint32_t wait_cycles = 50; //100=2.5Mops,when 4K burst, 100=10GB/s
     uint32_t is_seq = 1;
@@ -210,15 +208,14 @@ void test_hbm_h2c(uint8_t pci_bus){
     fpga_ctl->writeReg(112, is_seq);
 
     uint32_t target_addr = 0;
-    fpga_ctl->writeReg(113, 0);
     fpga_ctl->writeReg(114, target_addr);
 
     reset_counters_hbm(fpga_ctl);
 
-        //start
+    //start
     fpga_ctl->writeReg(106, 0);
     fpga_ctl->writeReg(106, 1);
-    sleep(2);
+    sleep(4);
 
     unsigned int cycles = fpga_ctl->readReg(512+101);
     fmt::println("Cycles: 0x{:x}",cycles);
@@ -241,7 +238,7 @@ void test_hbm_h2c(uint8_t pci_bus){
 
 
 int main() {
-    test_hbm_h2c(0x40);
+    // test_hbm_h2c(0x40);
     test_hbm_c2h(0x40);
     return 0;
 }

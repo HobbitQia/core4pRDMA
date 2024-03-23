@@ -98,13 +98,11 @@ class Foo extends Module{
 	axi2hbm.io.userRstn  := qdma.io.user_arstn
 	axi2hbm.io.hbmClk	 := hbm_clk
 	axi2hbm.io.hbmRstn	 := hbm_rstn
-	axi2hbm.io.hbmAxi	 <> hbm_driver.io.axi_hbm(0)
+	hbm_driver.io.axi_hbm(0) 	<> withClockAndReset(hbm_clk,!hbm_rstn){AXIRegSlice(2)(axi2hbm.io.hbmAxi)}
 	axi2hbm.io.hbmCtrlAw <> h2c.io.hbmCtrlAw
 	axi2hbm.io.hbmCtrlW	 <> qdma_h2c_data
 	axi2hbm.io.hbmCtrlAr <> c2h.io.hbmCtrlAr
 	axi2hbm.io.hbmCtrlR	 <> qdma_c2h_data
-	// h2c.io.cur_word		 := axi2hbm.io.wordCountW		// 传了多少个字（单位是 512 Bytes
-	// c2h.io.cur_word      := axi2hbm.io.wordCountR
 	val count_send_word_h2c	= RegInit(UInt(32.W),0.U)
 	val count_send_word_c2h	= RegInit(UInt(32.W),0.U)
 	when(qdma_h2c_data.fire){
@@ -157,7 +155,7 @@ class Foo extends Module{
 	val cpu_started = reg_control(222)(0)
 	// riscv-mini
 	val config = MiniConfig()
-	val mini_core = withClockAndReset(hbm_clk, cpu_started.asBool) { 
+	val mini_core = withClockAndReset(userClk, cpu_started.asBool) { 
 		Module(new Tile(
 		coreParams = config.core, 
 		nastiParams = config.nasti, 
@@ -165,24 +163,42 @@ class Foo extends Module{
 		))
 	}
 
-	val hbm_port = hbm_driver.io.axi_hbm(4)
-	hbm_port.ar <> mini_core.io.nasti.ar 
-	
-	mini_core.io.nasti.aw <> hbm_port.aw
-	mini_core.io.nasti.w  <> hbm_port.w
-	mini_core.io.nasti.r  <> hbm_port.r
-	mini_core.io.nasti.b  <> hbm_port.b
+	val hbm_port = hbm_driver.io.axi_hbm(1)
+
+	val core_axi = Wire(new AXI(33, 256, 6, 0, 4))
+
+	core_axi.aw <> mini_core.io.nasti.aw
+	core_axi.w <> mini_core.io.nasti.w
+	core_axi.ar <> mini_core.io.nasti.ar
+	core_axi.r <> mini_core.io.nasti.r
+	core_axi.b <> mini_core.io.nasti.b
+
+	hbm_port <> withClockAndReset(hbm_clk,!hbm_rstn){AXIRegSlice(2)(XAXIConverter(core_axi,userClk,!cpu_started.asBool,hbm_clk,hbm_rstn))}
 
 	mini_core.io.host := DontCare
 
-	val inst = Module(new ila_name(Seq(	
-	io.sysClk,			
-	// qdma.io.user_arstn,
-	// qdma_h2c_data.bits.data,
-	// qdma_h2c_data.bits.last,
+	class ila_qdma(seq:Seq[Data]) extends BaseILA(seq)
+	val inst = Module(new ila_qdma(Seq(				
 
 	qdma_c2h_data.bits.data,
-	// qdma_c2h_data.bits.last,
+	qdma_c2h_data.ready,
+	qdma_c2h_data.valid,
+	qdma_c2h_data.bits.last,
+	qdma_c2h_data.bits.ctrl_len,
+
+	qdma_c2h_cmd.valid,
+	qdma_c2h_cmd.ready,
+	qdma_c2h_cmd.bits.addr,
+	qdma_c2h_cmd.bits.len,
+	qdma_c2h_cmd.bits.qid,
+
+	)))
+	inst.connect(userClk)
+
+
+	class ila_hbm(seq:Seq[Data]) extends BaseILA(seq)
+	val inst_ilahbm = Module(new ila_hbm(Seq(				
+
 
 	// axi2hbm.io.hbmAxi.aw.bits.addr,
 	// axi2hbm.io.hbmAxi.aw.bits.len,
@@ -190,14 +206,18 @@ class Foo extends Module{
 	// axi2hbm.io.hbmAxi.w.bits.last,
 	// axi2hbm.io.hbmAxi.b.valid,
 
-
+	axi2hbm.io.hbmAxi.ar.ready,
+	axi2hbm.io.hbmAxi.ar.valid,
 	axi2hbm.io.hbmAxi.ar.bits.addr,
 	axi2hbm.io.hbmAxi.ar.bits.len,
+	axi2hbm.io.hbmAxi.r.ready,
+	axi2hbm.io.hbmAxi.r.valid,	
 	axi2hbm.io.hbmAxi.r.bits.data,
 	axi2hbm.io.hbmAxi.r.bits.last,
 
 	)))
-	inst.connect(clock)
+	inst_ilahbm.connect(hbm_clk)
+
+
 }
 
-class ila_name(seq:Seq[Data]) extends BaseILA(seq)

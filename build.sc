@@ -110,7 +110,7 @@ object mini extends ScalaModule {
         // ivy"org.chipsalliance::chisel:5.0.0"
 		ivy"edu.berkeley.cs::chisel3:3.5.1",
     )
-
+	def moduleDeps = Seq(common)
 	override def mainClass = Some("mini.elaborate")
 }
 

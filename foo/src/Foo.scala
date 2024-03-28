@@ -165,7 +165,7 @@ class Foo extends Module{
 
 	val hbm_port = hbm_driver.io.axi_hbm(1)
 
-	val core_axi = Wire(new AXI(33, 256, 6, 0, 4))
+	val core_axi = Wire(new AXI(33, 32, 6, 0, 4))
 
 	core_axi.aw <> mini_core.io.nasti.aw
 	core_axi.w <> mini_core.io.nasti.w
@@ -177,23 +177,23 @@ class Foo extends Module{
 
 	mini_core.io.host := DontCare
 
-	class ila_qdma(seq:Seq[Data]) extends BaseILA(seq)
-	val inst = Module(new ila_qdma(Seq(				
+	// class ila_qdma(seq:Seq[Data]) extends BaseILA(seq)
+	// val inst = Module(new ila_qdma(Seq(				
 
-	qdma_c2h_data.bits.data,
-	qdma_c2h_data.ready,
-	qdma_c2h_data.valid,
-	qdma_c2h_data.bits.last,
-	qdma_c2h_data.bits.ctrl_len,
+	// qdma_c2h_data.bits.data,
+	// qdma_c2h_data.ready,
+	// qdma_c2h_data.valid,
+	// qdma_c2h_data.bits.last,
+	// qdma_c2h_data.bits.ctrl_len,
 
-	qdma_c2h_cmd.valid,
-	qdma_c2h_cmd.ready,
-	qdma_c2h_cmd.bits.addr,
-	qdma_c2h_cmd.bits.len,
-	qdma_c2h_cmd.bits.qid,
+	// qdma_c2h_cmd.valid,
+	// qdma_c2h_cmd.ready,
+	// qdma_c2h_cmd.bits.addr,
+	// qdma_c2h_cmd.bits.len,
+	// qdma_c2h_cmd.bits.qid,
 
-	)))
-	inst.connect(userClk)
+	// )))
+	// inst.connect(userClk)
 
 
 	class ila_hbm(seq:Seq[Data]) extends BaseILA(seq)
@@ -206,14 +206,35 @@ class Foo extends Module{
 	// axi2hbm.io.hbmAxi.w.bits.last,
 	// axi2hbm.io.hbmAxi.b.valid,
 
-	axi2hbm.io.hbmAxi.ar.ready,
-	axi2hbm.io.hbmAxi.ar.valid,
-	axi2hbm.io.hbmAxi.ar.bits.addr,
-	axi2hbm.io.hbmAxi.ar.bits.len,
-	axi2hbm.io.hbmAxi.r.ready,
-	axi2hbm.io.hbmAxi.r.valid,	
-	axi2hbm.io.hbmAxi.r.bits.data,
-	axi2hbm.io.hbmAxi.r.bits.last,
+	// axi2hbm.io.hbmAxi.ar.ready,
+	// axi2hbm.io.hbmAxi.ar.valid,
+	// axi2hbm.io.hbmAxi.ar.bits.addr,
+	// axi2hbm.io.hbmAxi.ar.bits.len,
+	// axi2hbm.io.hbmAxi.r.ready,
+	// axi2hbm.io.hbmAxi.r.valid,	
+	// axi2hbm.io.hbmAxi.r.bits.data,
+	// axi2hbm.io.hbmAxi.r.bits.last,
+
+	hbm_port.aw.ready,
+	hbm_port.aw.valid,
+	hbm_port.aw.bits.addr,
+	hbm_port.aw.bits.size,
+	
+	hbm_port.w.ready,
+	hbm_port.w.valid,
+	hbm_port.w.bits.data,
+
+	hbm_port.b.ready,
+	hbm_port.b.valid,
+
+	hbm_port.ar.ready,
+	hbm_port.ar.valid,
+	hbm_port.ar.bits.addr,
+	hbm_port.ar.bits.size,
+
+	hbm_port.r.ready,
+	hbm_port.r.valid,
+	hbm_port.r.bits.data,
 
 	)))
 	inst_ilahbm.connect(hbm_clk)

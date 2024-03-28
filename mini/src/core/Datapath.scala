@@ -5,6 +5,9 @@ package mini.core
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.BundleLiterals._
+import common._
+import common.storage._
+import common.axi._
 
 object Const {
   val PC_START = 0x200
@@ -221,4 +224,30 @@ class Datapath(val conf: CoreConfig) extends Module {
 //      Mux(regFile.io.wen, regFile.io.wdata, 0.U)
 //    )
 //  }
+  class ila_core(seq:Seq[Data]) extends BaseILA(seq)
+    val inst_ila_core = Module(new ila_core(Seq(				
+      fe_reg.pc,
+      fe_reg.inst,
+      io.dcache.req.bits.addr,
+      io.dcache.req.bits.data,
+      io.dcache.req.bits.mask,
+      io.dcache.req.valid,
+      io.dcache.resp.bits.data,
+      io.dcache.resp.valid,
+
+      io.icache.req.bits.addr,
+      io.icache.req.valid,
+      io.icache.resp.bits.data,
+      io.icache.resp.valid,
+
+      stall,
+      regFile.io.waddr,
+      regFile.io.wdata,
+      regFile.io.wen,
+
+      ew_reg.pc,
+      ew_reg.inst,
+
+    )))
+    inst_ila_core.connect(clock)
 }

@@ -6,6 +6,9 @@ import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.util._
 import mini.junctions._
+import common._
+import common.storage._
+import common.axi._
 
 class CacheReq(addrWidth: Int, dataWidth: Int) extends Bundle {
   val addr = UInt(addrWidth.W)
@@ -39,188 +42,118 @@ object CacheState extends ChiselEnum {
 }
 
 class Cache(val p: CacheConfig, val nasti: NastiBundleParameters, val xlen: Int) extends Module {
-  // local parameters
-  val nSets = p.nSets
-  val bBytes = p.blockBytes
-  val bBits = bBytes << 3
-  val blen = log2Ceil(bBytes)
-  val slen = log2Ceil(nSets)
-  val tlen = xlen - (slen + blen)
-  val nWords = bBits / xlen
-  val wBytes = xlen / 8
-  val byteOffsetBits = log2Ceil(wBytes)
-  val dataBeats = bBits / nasti.dataBits
-
   val io = IO(new CacheModuleIO(nasti, addrWidth = xlen, dataWidth = xlen))
 
-  // cache states
-  import CacheState._
-  val state = RegInit(sIdle)
-  // memory
-  val v = RegInit(0.U(nSets.W))
-  val d = RegInit(0.U(nSets.W))
-  val metaMem = SyncReadMem(nSets, new MetaData(tlen))
-  val dataMem = Seq.fill(nWords)(SyncReadMem(nSets, Vec(wBytes, UInt(8.W))))
+  val wen = io.cpu.req.bits.mask.orR 
+  // construct a mask that remote the block offset
+  val mem_addr     = io.cpu.req.bits.addr & "h1FFFFFFFC".U
+  val addr_reg     = Reg(chiselTypeOf(io.cpu.req.bits.addr))
+  val data_reg     = Reg(chiselTypeOf(io.cpu.req.bits.data))
+  val valid_reg    = RegNext(io.cpu.resp.valid)
+  val resp_data    = Reg(chiselTypeOf(io.cpu.resp.bits.data))
 
-  val addr_reg = Reg(chiselTypeOf(io.cpu.req.bits.addr))
-  val cpu_data = Reg(chiselTypeOf(io.cpu.req.bits.data))
-  val cpu_mask = Reg(chiselTypeOf(io.cpu.req.bits.mask))
-
-  // Counters
-  require(dataBeats > 0)
-  val (read_count, read_wrap_out) = Counter(io.nasti.r.fire, dataBeats)
-  val (write_count, write_wrap_out) = Counter(io.nasti.w.fire, dataBeats)
-
-  val is_idle = state === sIdle
-  val is_read = state === sReadCache
-  val is_write = state === sWriteCache
-  val is_alloc = state === sRefill && read_wrap_out
-  val is_alloc_reg = RegNext(is_alloc)
-
-  val hit = Wire(Bool())
-  val wen = is_write && (hit || is_alloc_reg) && !io.cpu.abort || is_alloc
-  val ren = !wen && (is_idle || is_read) && io.cpu.req.valid
-  val ren_reg = RegNext(ren)
-
-  val addr = io.cpu.req.bits.addr
-  val idx = addr(slen + blen - 1, blen)
-  val tag_reg = addr_reg(xlen - 1, slen + blen)
-  val idx_reg = addr_reg(slen + blen - 1, blen)
-  val off_reg = addr_reg(blen - 1, byteOffsetBits)
-
-  val rmeta = metaMem.read(idx, ren)
-  val rdata = Cat((dataMem.map(_.read(idx, ren).asUInt)).reverse)
-  val rdata_buf = RegEnable(rdata, ren_reg)
-  val refill_buf = Reg(Vec(dataBeats, UInt(nasti.dataBits.W)))
-  val read = Mux(is_alloc_reg, refill_buf.asUInt, Mux(ren_reg, rdata, rdata_buf))
-
-  hit := v(idx_reg) && rmeta.tag === tag_reg
-
-  // Read Mux
-  io.cpu.resp.bits.data := VecInit.tabulate(nWords)(i => read((i + 1) * xlen - 1, i * xlen))(off_reg)
-  io.cpu.resp.valid := is_idle || is_read && hit || is_alloc_reg && !cpu_mask.orR
-
-  when(io.cpu.resp.valid) {
-    addr_reg := addr
-    cpu_data := io.cpu.req.bits.data
-    cpu_mask := io.cpu.req.bits.mask
-  }
-
-  val wmeta = Wire(new MetaData(tlen))
-  wmeta.tag := tag_reg
-
-  val wmask = Mux(!is_alloc, (cpu_mask << Cat(off_reg, 0.U(byteOffsetBits.W))).zext, (-1).S)
-  val wdata = Mux(
-    !is_alloc,
-    Fill(nWords, cpu_data),
-    if (refill_buf.size == 1) io.nasti.r.bits.data
-    else Cat(io.nasti.r.bits.data, Cat(refill_buf.init.reverse))
-  )
-  when(wen) {
-    v := v.bitSet(idx_reg, true.B)
-    d := d.bitSet(idx_reg, !is_alloc)
-    when(is_alloc) {
-      metaMem.write(idx_reg, wmeta)
-    }
-    dataMem.zipWithIndex.foreach {
-      case (mem, i) =>
-        val data = VecInit.tabulate(wBytes)(k => wdata(i * xlen + (k + 1) * 8 - 1, i * xlen + k * 8))
-        mem.write(idx_reg, data, wmask((i + 1) * wBytes - 1, i * wBytes).asBools())
-        mem.suggestName(s"dataMem_${i}")
-    }
-  }
-
+  // val block_offset = io.cpu.req.bits.addr(4, 2) & "h1F".U
+  // val mask = "h1FFFFFFFC".U
+  // Read
   io.nasti.ar.bits := NastiAddressBundle(nasti)(
     0.U,
-    (Cat(tag_reg, idx_reg) << blen.U).asUInt,
-    log2Up(nasti.dataBits / 8).U,
-    (dataBeats - 1).U
+    addr_reg,
+    2.U,
+    0.U
   )
-  io.nasti.ar.valid := false.B
-  // read data
-  io.nasti.r.ready := state === sRefill
-  when(io.nasti.r.fire) {
-    refill_buf(read_count) := io.nasti.r.bits.data
+  // io.nasti.ar.valid := io.cpu.req.valid && !wen && !io.cpu.abort
+  import CacheState._
+  val state = RegInit(sIdle)
+  io.nasti.r.ready  := state === sReadCache
+  val read_state = (state === sReadCache) && (io.nasti.r.fire === true.B)
+  val write_state = (state === sWriteCache) && (io.nasti.b.fire === true.B)
+  io.cpu.resp.valid := (state === sIdle) || read_state || write_state
+  when(io.cpu.resp.valid) {
+    addr_reg := mem_addr
+    data_reg := io.cpu.req.bits.data
   }
+  when(read_state) {
+    resp_data := io.nasti.r.bits.data
+  }
+  io.cpu.resp.bits.data := Mux(valid_reg, resp_data, io.nasti.r.bits.data)
 
-  // write addr
+  // Write
   io.nasti.aw.bits := NastiAddressBundle(nasti)(
     0.U,
-    (Cat(rmeta.tag, idx_reg) << blen.U).asUInt,
-    log2Up(nasti.dataBits / 8).U,
-    (dataBeats - 1).U
+    addr_reg,
+    2.U,
+    0.U
   )
-  io.nasti.aw.valid := false.B
-  // write data
+  // io.nasti.aw.valid := io.cpu.req.valid && wen && !io.cpu.abort
+  io.nasti.w.valid := state === sWriteCache
   io.nasti.w.bits := NastiWriteDataBundle(nasti)(
-    VecInit.tabulate(dataBeats)(i => read((i + 1) * nasti.dataBits - 1, i * nasti.dataBits))(write_count),
+    data_reg,
     None,
-    write_wrap_out
+    true.B
   )
-  io.nasti.w.valid := false.B
-  // write resp
-  io.nasti.b.ready := false.B
+  io.nasti.b.ready := true.B
+  io.nasti.ar.valid := false.B
+  io.nasti.aw.valid := false.B
 
-  // Cache FSM
-  val is_dirty = v(idx_reg) && d(idx_reg)
   switch(state) {
     is(sIdle) {
-      when(io.cpu.req.valid) {
-        state := Mux(io.cpu.req.bits.mask.orR, sWriteCache, sReadCache)
+      when(io.cpu.abort) {
+        state := sIdle
+      }.elsewhen(io.cpu.req.valid) {
+        state := Mux(wen, sWriteCache, sReadCache)
       }
     }
     is(sReadCache) {
-      when(hit) {
+      io.nasti.ar.valid := true.B
+      when(io.cpu.abort) {
+        state := sIdle
+      }.elsewhen(io.nasti.r.fire) {
         when(io.cpu.req.valid) {
-          state := Mux(io.cpu.req.bits.mask.orR, sWriteCache, sReadCache)
+          state := Mux(wen, sWriteCache, sReadCache)
         }.otherwise {
           state := sIdle
-        }
-      }.otherwise {
-        io.nasti.aw.valid := is_dirty
-        io.nasti.ar.valid := !is_dirty
-        when(io.nasti.aw.fire) {
-          state := sWriteBack
-        }.elsewhen(io.nasti.ar.fire) {
-          state := sRefill
         }
       }
     }
     is(sWriteCache) {
-      when(hit || is_alloc_reg || io.cpu.abort) {
+      io.nasti.aw.valid := true.B
+      when(io.cpu.abort) {
         state := sIdle
-      }.otherwise {
-        io.nasti.aw.valid := is_dirty
-        io.nasti.ar.valid := !is_dirty
-        when(io.nasti.aw.fire) {
-          state := sWriteBack
-        }.elsewhen(io.nasti.ar.fire) {
-          state := sRefill
+      }.elsewhen(io.nasti.b.fire) {
+        when(io.cpu.req.valid) {
+          state := Mux(wen, sWriteCache, sReadCache)
+        }.otherwise {
+          state := sIdle
         }
       }
     }
-    is(sWriteBack) {
-      io.nasti.w.valid := true.B
-      when(write_wrap_out) {
-        state := sWriteAck
-      }
-    }
-    is(sWriteAck) {
-      io.nasti.b.ready := true.B
-      when(io.nasti.b.fire) {
-        state := sRefillReady
-      }
-    }
-    is(sRefillReady) {
-      io.nasti.ar.valid := true.B
-      when(io.nasti.ar.fire) {
-        state := sRefill
-      }
-    }
-    is(sRefill) {
-      when(read_wrap_out) {
-        state := Mux(cpu_mask.orR, sWriteCache, sIdle)
-      }
-    }
   }
+
+  class ila_cache(seq:Seq[Data]) extends BaseILA(seq)
+	val inst_ila_cache = Module(new ila_cache(Seq(				
+  state,
+	io.cpu.req.bits.addr,
+  io.cpu.req.bits.data,
+  io.cpu.req.bits.mask,
+  io.cpu.abort,
+  io.cpu.req.valid,
+  io.cpu.resp.valid,
+  io.cpu.resp.bits.data,
+
+  io.nasti.ar.valid,
+  io.nasti.ar.bits.addr,
+  io.nasti.ar.ready,
+  io.nasti.r.valid,
+  io.nasti.r.bits.data,
+  io.nasti.r.ready,
+  io.nasti.aw.valid,
+  io.nasti.aw.bits.addr,
+  io.nasti.aw.ready,
+  io.nasti.w.valid,
+  io.nasti.w.bits.data,
+  io.nasti.w.ready,
+  io.nasti.b.valid,
+
+	)))
+	inst_ila_cache.connect(clock)
 }

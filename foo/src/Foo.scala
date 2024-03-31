@@ -158,6 +158,7 @@ class Foo extends Module{
 	val mini_core = withClockAndReset(userClk, cpu_started.asBool) { 
 		Module(new Tile(
 		coreParams = config.core, 
+		bramParams = config.bram,
 		nastiParams = config.nasti, 
 		cacheParams = config.cache
 		))
@@ -165,7 +166,7 @@ class Foo extends Module{
 
 	val hbm_port = hbm_driver.io.axi_hbm(1)
 
-	val core_axi = Wire(new AXI(33, 32, 6, 0, 4))
+	val core_axi = Wire(new AXI(33, 256, 6, 0, 4))
 
 	core_axi.aw <> mini_core.io.nasti.aw
 	core_axi.w <> mini_core.io.nasti.w

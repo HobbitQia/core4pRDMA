@@ -15,6 +15,7 @@ object elaborate extends App {
       (new ChiselStage()).emitSystemVerilog(
         new Tile(
           coreParams = config.core,
+          bramParams = config.bram,
           nastiParams = config.nasti,
           cacheParams = config.cache
         ),

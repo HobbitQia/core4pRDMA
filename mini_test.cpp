@@ -122,7 +122,7 @@ void test_hbm_c2h(uint8_t pci_bus) {
     fpga_ctl->writeReg(205, total_words);
     fpga_ctl->writeReg(206, total_qs);
     fpga_ctl->writeReg(207, total_cmds);
-    uint32_t target_addr = 0x0;
+    uint32_t target_addr = 0x400;
     fpga_ctl->writeReg(214, target_addr);
 
     for(int i=0;i<1;i++){//one q in total
@@ -279,7 +279,7 @@ void test_hbm_h2c(uint8_t pci_bus){
 }
 
 int main() {
-    test_hbm_h2c(0x40);
+    // test_hbm_h2c(0x40);
     test_hbm_c2h(0x40);
     return 0;
 }

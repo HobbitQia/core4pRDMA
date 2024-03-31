@@ -14,6 +14,7 @@ object Main extends App {
       ChiselGeneratorAnnotation(() =>
         new Tile(
           coreParams = config.core,
+          bramParams = config.bram,
           nastiParams = config.nasti,
           cacheParams = config.cache
         )

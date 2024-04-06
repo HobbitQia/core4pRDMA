@@ -164,6 +164,11 @@ class Foo extends Module{
 		))
 	}
 
+	reg_status(300) := mini_core.io.rdma_print_addr
+	reg_status(301) := mini_core.io.rdma_print_string_num
+	reg_status(302) := mini_core.io.rdma_print_string_len
+	reg_status(303) := mini_core.io.rdma_trap
+
 	val hbm_port = hbm_driver.io.axi_hbm(1)
 
 	val core_axi = Wire(new AXI(33, 256, 6, 0, 4))

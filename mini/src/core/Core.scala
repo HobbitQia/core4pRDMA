@@ -20,6 +20,11 @@ class CoreIO(xlen: Int) extends Bundle {
   val host = new HostIO(xlen)
   val icache = Flipped(new CacheIO(xlen, xlen))
   val dcache = Flipped(new CacheIO(xlen, xlen))
+  // RDMA CSR
+  val rdma_print_addr = Output(UInt(xlen.W))
+  val rdma_print_string_num = Output(UInt(xlen.W))
+  val rdma_print_string_len = Output(UInt(xlen.W))
+  val rdma_trap = Output(UInt(xlen.W))
 }
 
 class Core(val conf: CoreConfig) extends Module {
@@ -31,4 +36,8 @@ class Core(val conf: CoreConfig) extends Module {
   dpath.io.icache <> io.icache
   dpath.io.dcache <> io.dcache
   dpath.io.ctrl <> ctrl.io
+  io.rdma_print_addr := dpath.io.rdma_print_addr
+  io.rdma_print_string_num := dpath.io.rdma_print_string_num
+  io.rdma_print_string_len := dpath.io.rdma_print_string_len
+  io.rdma_trap := dpath.io.rdma_trap
 }

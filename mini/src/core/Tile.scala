@@ -10,14 +10,14 @@ import common._
 import common.storage._
 import common.axi._
 
-case class BramParameters( entries : Int, width : Int, staddr : Int, edaddr : Int) {
-    require(entries >= 2, "BRAM must has at least 2 entries")
-    require(entries <= 1024*1024, "BRAM out of range")
-    require(width >= 0, "BRAM's width can't be less than 0")
-    require(width <= 1024, "BRAM's width can't be more than 1024")
-    require(staddr >= 0, "BRAM's start address can't be less than 0")
-    require(edaddr >= 0, "BRAM's end address can't be less than 0")
-    require(staddr <= edaddr, "BRAM's start address can't be more than end address")
+case class BramParameters( width : Int, staddr : String, edaddr : String, i_offset : String, d_offset : String, inst_entries : Int, data_entries : Int) {
+    // require(entries >= 2, "BRAM must has at least 2 entries")
+    // require(entries <= 1024*1024, "BRAM out of range")
+    // require(width >= 0, "BRAM's width can't be less than 0")
+    // require(width <= 1024, "BRAM's width can't be more than 1024")
+    // require(staddr <= edaddr, "BRAM's start address can't be more than end address")
+    // require(d_offset.U - i_offset.U === inst_entries * width / 8.U, "BRAM inst should match")  
+    // require(edaddr.U - staddr.U === data_entries * width / 8.U, "BRAM data should match ")
     // todo
 }
 
@@ -40,7 +40,11 @@ class MemArbiter(val xlen: Int, val nastiParams: NastiBundleParameters, val bram
     dbram.io.abort := io.dbram.abort
     // dbram2.io.req <> io.dbram.req
     // dbram2.io.abort := io.dbram.abort
-    cache.io.cpu.req <> io.dbram.req
+    // cache.io.cpu.req <> io.dbram.req
+    cache.io.cpu.req.valid := io.dbram.req.valid
+    cache.io.cpu.req.bits.addr := io.dbram.req.bits.addr - bramParams.edaddr.U
+    cache.io.cpu.req.bits.data := io.dbram.req.bits.data
+    cache.io.cpu.req.bits.mask := io.dbram.req.bits.mask
     cache.io.cpu.abort := io.dbram.abort
     cache.io.nasti <> io.nasti
 
@@ -99,6 +103,11 @@ class MemArbiter(val xlen: Int, val nastiParams: NastiBundleParameters, val bram
 class TileIO(xlen: Int, nastiParams: NastiBundleParameters) extends Bundle {
     val host = new HostIO(xlen)
     val nasti = new NastiBundle(nastiParams)
+    // RDMA CSR
+    val rdma_print_addr = Output(UInt(xlen.W))
+    val rdma_print_string_num = Output(UInt(xlen.W))
+    val rdma_print_string_len = Output(UInt(xlen.W))
+    val rdma_trap = Output(UInt(xlen.W))
 }
 
 object Tile {
@@ -116,16 +125,22 @@ class Tile(val coreParams: CoreConfig, val nastiParams: NastiBundleParameters, v
     arb.io.ibram <> core.io.icache
     arb.io.dbram <> core.io.dcache
     io.nasti <> arb.io.nasti            // for hbm
+    io.rdma_print_addr := core.io.rdma_print_addr
+    io.rdma_print_string_num := core.io.rdma_print_string_num
+    io.rdma_print_string_len := core.io.rdma_print_string_len
+    io.rdma_trap := core.io.rdma_trap
 }
 
 // 处理 inst
 class Bram(val InstBram: Boolean, val b: BramParameters, val nasti: NastiBundleParameters, val xlen: Int, val file: String) extends Module {
     val io = IO(new CacheIO(addrWidth = xlen, dataWidth = xlen))
-    
-    val bram = XRam(UInt(b.width.W), entries=b.entries, latency=1, use_musk=1, initFile=file)
     if (InstBram) {
+        val bram = XRam(UInt(b.width.W), entries=b.inst_entries, latency=1, use_musk=1, initFile=file)
+        val i_addr = log2Ceil(b.inst_entries).U
+        val offset = log2Ceil(b.width/8).U
         bram.io.addr_a := DontCare
-        bram.io.addr_b := io.req.bits.addr(9, 2)
+        val offset_addr = io.req.bits.addr - b.i_offset.U(xlen.W)
+        bram.io.addr_b := offset_addr >> offset
         bram.io.wr_en_a := DontCare
         bram.io.musk_a.get := DontCare    
         bram.io.data_in_a := DontCare
@@ -133,7 +148,11 @@ class Bram(val InstBram: Boolean, val b: BramParameters, val nasti: NastiBundleP
         io.resp.valid := true.B
     }
     else {
-        bram.io.addr_a := io.req.bits.addr(9, 2)
+        val bram = XRam(UInt(b.width.W), entries=b.data_entries, latency=1, use_musk=1, initFile=file)
+        val d_addr = log2Ceil(b.data_entries).U
+        val offset = log2Ceil(b.width/8).U
+        val offset_addr = io.req.bits.addr - b.d_offset.U(xlen.W)
+        bram.io.addr_a := offset_addr >> offset
         bram.io.addr_b := DontCare
         bram.io.wr_en_a := io.req.valid && io.req.bits.mask.orR && !io.abort
         bram.io.musk_a.get := io.req.bits.mask.asUInt

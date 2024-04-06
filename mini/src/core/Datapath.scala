@@ -10,7 +10,7 @@ import common.storage._
 import common.axi._
 
 object Const {
-  val PC_START = 0x200
+  val PC_START = "x80000000"
   val PC_EVEC = 0x100
 }
 
@@ -19,6 +19,11 @@ class DatapathIO(xlen: Int) extends Bundle {
   val icache = Flipped(new CacheIO(xlen, xlen))
   val dcache = Flipped(new CacheIO(xlen, xlen))
   val ctrl = Flipped(new ControlSignals)
+  // RDMA CSR
+  val rdma_print_addr = Output(UInt(xlen.W))
+  val rdma_print_string_num = Output(UInt(xlen.W))
+  val rdma_print_string_len = Output(UInt(xlen.W))
+  val rdma_trap = Output(UInt(xlen.W))
 }
 
 class FetchExecutePipelineRegister(xlen: Int) extends Bundle {
@@ -42,6 +47,11 @@ class Datapath(val conf: CoreConfig) extends Module {
   val brCond = Module(conf.makeBrCond(conf.xlen))
 
   import Control._
+
+  io.rdma_print_addr := csr.io.rdma_print_addr
+  io.rdma_print_string_num := csr.io.rdma_print_string_num
+  io.rdma_print_string_len := csr.io.rdma_print_string_len
+  io.rdma_trap := csr.io.rdma_trap
 
   /** Pipeline State Registers * */
 
@@ -226,6 +236,7 @@ class Datapath(val conf: CoreConfig) extends Module {
 //  }
   class ila_core(seq:Seq[Data]) extends BaseILA(seq)
     val inst_ila_core = Module(new ila_core(Seq(				
+      started,
       fe_reg.pc,
       fe_reg.inst,
       io.dcache.req.bits.addr,

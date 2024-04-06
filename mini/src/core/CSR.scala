@@ -4,6 +4,9 @@ package mini.core
 
 import chisel3._
 import chisel3.util._
+import common._
+import common.storage._
+import common.axi._
 
 object CSR {
   val N = 0.U(3.W)
@@ -55,6 +58,11 @@ object CSR {
   // Machine HITF
   val mtohost = 0x780.U(12.W)
   val mfromhost = 0x781.U(12.W)
+  // RDMA CSR
+  val rdma_print_addr = 0xF0.U(12.W)
+  val rdma_print_string_num = 0xF1.U(12.W)
+  val rdma_print_string_len = 0xF2.U(12.W)
+  val rdma_trap = 0xF3.U(12.W)
 
   val regs = List(
     cycle,
@@ -85,7 +93,12 @@ object CSR {
     mip,
     mtohost,
     mfromhost,
-    mstatus
+    mstatus,
+    // RDMA CSR
+    rdma_print_addr,
+    rdma_print_string_num,
+    rdma_print_string_len,
+    rdma_trap
   )
 }
 
@@ -116,6 +129,11 @@ class CSRIO(xlen: Int) extends Bundle {
   val epc = Output(UInt(xlen.W))
   // HTIF
   val host = new HostIO(xlen)
+  // RDMA CSR
+  val rdma_print_addr = Output(UInt(xlen.W))
+  val rdma_print_string_num = Output(UInt(xlen.W))
+  val rdma_print_string_len = Output(UInt(xlen.W))
+  val rdma_trap = Output(UInt(xlen.W))
 }
 
 class CSR(val xlen: Int) extends Module {
@@ -131,6 +149,16 @@ class CSR(val xlen: Int) extends Module {
   val cycleh = RegInit(0.U(xlen.W))
   val instret = RegInit(0.U(xlen.W))
   val instreth = RegInit(0.U(xlen.W))
+  // RDMA CSR
+  val rdma_print_addr = RegInit(0.U(xlen.W))
+  val rdma_print_string_num = RegInit(0.U(xlen.W))
+  val rdma_print_string_len = RegInit(0.U(xlen.W))
+  val rdma_trap = RegInit(0.U(xlen.W))
+
+  io.rdma_print_addr := rdma_print_addr
+  io.rdma_print_string_num := rdma_print_string_num
+  io.rdma_print_string_len := rdma_print_string_len
+  io.rdma_trap := rdma_trap
 
   val mcpuid = Cat(
     0.U(2.W) /* RV32I */,
@@ -222,7 +250,13 @@ class CSR(val xlen: Int) extends Module {
     BitPat(CSR.mip) -> mip,
     BitPat(CSR.mtohost) -> mtohost,
     BitPat(CSR.mfromhost) -> mfromhost,
-    BitPat(CSR.mstatus) -> mstatus
+    BitPat(CSR.mstatus) -> mstatus,
+    // RDMA CSR
+    BitPat(CSR.rdma_print_addr) -> rdma_print_addr,
+    BitPat(CSR.rdma_print_string_num) -> rdma_print_string_num,
+    BitPat(CSR.rdma_print_string_len) -> rdma_print_string_len,
+    BitPat(CSR.rdma_trap) -> rdma_trap
+
   )
 
   io.out := Lookup(csr_addr, 0.U, csrFile).asUInt
@@ -325,4 +359,31 @@ class CSR(val xlen: Int) extends Module {
         .elsewhen(csr_addr === CSR.instrethw) { instreth := wdata }
     }
   }
+
+  class ila_csr(seq:Seq[Data]) extends BaseILA(seq)
+    val inst_ila_csr = Module(new ila_csr(Seq(				
+      io.stall,
+      io.cmd,
+      io.in,
+      io.out,
+      io.pc,
+      io.addr,
+      io.inst,
+      io.illegal,
+      io.st_type,
+      io.ld_type,
+      io.pc_check,
+      io.expt,
+      io.evec,
+      io.epc,
+      mepc,
+      mcause,
+      mstatus,
+
+      rdma_print_addr,
+      rdma_print_string_num,
+      rdma_print_string_len,
+      rdma_trap,
+    )))
+    inst_ila_csr.connect(clock)
 }

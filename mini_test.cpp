@@ -122,7 +122,7 @@ void test_hbm_c2h(uint8_t pci_bus) {
     fpga_ctl->writeReg(205, total_words);
     fpga_ctl->writeReg(206, total_qs);
     fpga_ctl->writeReg(207, total_cmds);
-    uint32_t target_addr = 0x400;
+    uint32_t target_addr = 0x4000;
     fpga_ctl->writeReg(214, target_addr);
 
     for(int i=0;i<1;i++){//one q in total
@@ -143,10 +143,10 @@ void test_hbm_c2h(uint8_t pci_bus) {
 
     // // fpga_ctl->writeReg(222, 0);
     // fpga_ctl->writeReg(223, 0);
-    fpga_ctl->writeReg(222, 0xffffffff);     // start mini core
-    sleep(5);
-    fpga_ctl->writeReg(222, 0);
-    sleep(10);
+    // fpga_ctl->writeReg(222, 0xffffffff);     // start mini core
+    // sleep(5);
+    // fpga_ctl->writeReg(222, 0);
+    // sleep(10);
 
     fpga_ctl->writeReg(204, 0);
     fpga_ctl->writeReg(204, 1);
@@ -167,30 +167,19 @@ void test_hbm_c2h(uint8_t pci_bus) {
         fmt::println("Memory 0x{} 0x{:x}", i, cpu_mem[i]);
     }
 
-    // {//c2h
-    //     printf("C2H status:\n");
-    //     int count_error = 0;
-    //     int count_error_word = 0;
+    /*
+    reg_status(300) := mini_core.io.rdma_print_addr
+	reg_status(301) := mini_core.io.rdma_print_string_num
+	reg_status(302) := mini_core.io.rdma_print_string_len
+	reg_status(303) := mini_core.io.rdma_trap
+    */
+    fmt::println("rdma_print_addr: 0x{:x}", fpga_ctl->readReg(512+300));
+    fmt::println("rdma_print_string_num: 0x{:x}", fpga_ctl->readReg(512+301));
+    fmt::println("rdma_print_string_len: 0x{:x}", fpga_ctl->readReg(512+302));
+    fmt::println("rdma_trap: 0x{:x}", fpga_ctl->readReg(512+303));
 
-    //     for(int i = 0; i < total_words; i++) {
-    //         int bj = 0;
-    //         for (int j = 0; j < 8; j++) {
-    //             if (p_c2h[i*8+j] != offset + 64 * i + j) {
-    //                 if (count_error < 20)
-    //                 fmt::println("now:    0x{:x}, should be 0x{:x}", p_c2h[i*8+j], offset + 64 * i + j);
-    //                 bj = 1;
-    //                 count_error ++;
-    //             }
-    //         }
-    //         if (bj == 1) count_error_word++;
-    //     }
-    //     fmt::println("There are total 0x{:x} words transferred", total_words);
-    //     fmt::println("count_error:    0x{:x}, shoule be: 0x0", count_error);
-    //     fmt::println("count_error_word:    0x{:x}, shoule be: 0x0", count_error_word);
 
-    //     fmt::print("\n");
-        throughput_benchmark_print_counters_hbm(fpga_ctl);
-    // }
+    throughput_benchmark_print_counters_hbm(fpga_ctl);
     cpu_mem_ctl->free(dma_buff);
 }
 

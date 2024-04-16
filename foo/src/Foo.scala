@@ -202,8 +202,8 @@ class Foo extends Module{
 	// inst.connect(userClk)
 
 
-	class ila_hbm(seq:Seq[Data]) extends BaseILA(seq)
-	val inst_ilahbm = Module(new ila_hbm(Seq(				
+	// class ila_hbm(seq:Seq[Data]) extends BaseILA(seq)
+	// val inst_ilahbm = Module(new ila_hbm(Seq(				
 
 
 	// axi2hbm.io.hbmAxi.aw.bits.addr,
@@ -221,29 +221,29 @@ class Foo extends Module{
 	// axi2hbm.io.hbmAxi.r.bits.data,
 	// axi2hbm.io.hbmAxi.r.bits.last,
 
-	hbm_port.aw.ready,
-	hbm_port.aw.valid,
-	hbm_port.aw.bits.addr,
-	hbm_port.aw.bits.size,
+	// hbm_port.aw.ready,
+	// hbm_port.aw.valid,
+	// hbm_port.aw.bits.addr,
+	// hbm_port.aw.bits.size,
 	
-	hbm_port.w.ready,
-	hbm_port.w.valid,
-	hbm_port.w.bits.data,
+	// hbm_port.w.ready,
+	// hbm_port.w.valid,
+	// hbm_port.w.bits.data,
 
-	hbm_port.b.ready,
-	hbm_port.b.valid,
+	// hbm_port.b.ready,
+	// hbm_port.b.valid,
 
-	hbm_port.ar.ready,
-	hbm_port.ar.valid,
-	hbm_port.ar.bits.addr,
-	hbm_port.ar.bits.size,
+	// hbm_port.ar.ready,
+	// hbm_port.ar.valid,
+	// hbm_port.ar.bits.addr,
+	// hbm_port.ar.bits.size,
 
-	hbm_port.r.ready,
-	hbm_port.r.valid,
-	hbm_port.r.bits.data,
+	// hbm_port.r.ready,
+	// hbm_port.r.valid,
+	// hbm_port.r.bits.data,
 
-	)))
-	inst_ilahbm.connect(hbm_clk)
+	// )))
+	// inst_ilahbm.connect(hbm_clk)
 
 
 }

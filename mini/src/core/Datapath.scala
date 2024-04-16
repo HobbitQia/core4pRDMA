@@ -84,6 +84,13 @@ class Datapath(val conf: CoreConfig) extends Module {
   val csr_cmd = Reg(io.ctrl.csr_cmd.cloneType)
   val illegal = Reg(Bool())
   val pc_check = Reg(Bool())
+  val is_wfi = RegInit(Bool(), false.B)
+  
+  when(fe_reg.inst === Instructions.WFI) {
+    is_wfi := true.B
+  }.otherwise {
+    is_wfi := is_wfi
+  }
 
   /** **** Fetch ****
     */
@@ -102,7 +109,7 @@ class Datapath(val conf: CoreConfig) extends Module {
     )
   )
   val inst =
-    Mux(started || io.ctrl.inst_kill || brCond.io.taken || csr.io.expt, Instructions.NOP, io.icache.resp.bits.data)
+    Mux(started || io.ctrl.inst_kill || brCond.io.taken || csr.io.expt || is_wfi, Instructions.NOP, io.icache.resp.bits.data)
   pc := next_pc
   io.icache.req.bits.addr := next_pc
   io.icache.req.bits.data := 0.U
@@ -237,6 +244,9 @@ class Datapath(val conf: CoreConfig) extends Module {
   class ila_core(seq:Seq[Data]) extends BaseILA(seq)
     val inst_ila_core = Module(new ila_core(Seq(				
       started,
+      pc,
+      inst,
+      is_wfi,
       fe_reg.pc,
       fe_reg.inst,
       io.dcache.req.bits.addr,

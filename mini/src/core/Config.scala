@@ -23,13 +23,13 @@ object MiniConfig {
         blockBytes = 32
       ),
       bram = BramParameters(
-        inst_entries = 2048,
+        inst_entries = 4096,
         i_offset = "x80000000",
-        d_offset = "x80002000",
+        d_offset = "x80004000",
         data_entries = 4096,
         width = 32,
-        staddr = "x80002000",
-        edaddr = "x80006000"
+        staddr = "x80004000",
+        edaddr = "x80008000"
       ),
       nasti = NastiBundleParameters(
         addrBits = 33,

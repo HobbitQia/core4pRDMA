@@ -101,29 +101,45 @@ void test_hbm_c2h(uint8_t pci_bus) {
         fpga_ctl->writeReg(13, 0);
     });
 
+    fpga_ctl->writeReg(222, 0);
+    fpga_ctl->writeReg(223, 0);
+    fpga_ctl->writeReg(222, 0xffffffff);     // start mini core
+    sleep(5);
+    fpga_ctl->writeReg(222, 0);
+    sleep(10);
+
+    /*
+    reg_status(300) := mini_core.io.rdma_print_addr
+	reg_status(301) := mini_core.io.rdma_print_string_num
+	reg_status(302) := mini_core.io.rdma_print_string_len
+	reg_status(303) := mini_core.io.rdma_trap
+    */
+    fmt::println("rdma_print_addr: 0x{:x}", fpga_ctl->readReg(512+300));
+    fmt::println("rdma_print_string_num: 0x{:x}", fpga_ctl->readReg(512+301));
+    fmt::println("rdma_print_string_len: 0x{:x}", fpga_ctl->readReg(512+302));
+    fmt::println("rdma_trap: 0x{:x}", fpga_ctl->readReg(512+303));
+    uint32_t offset = 0x80008000;
+    uint32_t target_addr = fpga_ctl->readReg(512+300) - offset;
+    fmt::println("tatget_addr: 0x{:x}", target_addr);
+    fpga_ctl->writeReg(214, target_addr);
+
     uint32_t total_cmds = 1;
-    uint32_t total_words = 1024;
-    uint32_t length = 64 * total_words; 
-    uint32_t wait_cycles = 50; //100=2.5Mops,when 4K burst, 100=10GB/s
+    uint32_t length = fpga_ctl->readReg(512+302); 
+    uint32_t total_words = (length + 63) / 64;
+    length = total_words * 64;
     uint32_t total_qs = 1;
 
     auto dma_buff = cpu_mem_ctl->alloc(size);
-    uint32_t offset = GLOABL_OFFSET;
     size_t * p_c2h = ((size_t *) dma_buff) + size/2/sizeof(size_t);
     for(size_t i=0;i<size/2/sizeof(size_t);i++){
         p_c2h[i]=0;
     }
-    fmt::println("h2c addr: 0x{:x}, 0x{:x}",(uint32_t)((uint64_t) dma_buff >> 32), (uint32_t)((uint64_t) dma_buff) );
-    fmt::println("c2h addr: 0x{:x}, 0x{:x}",(uint32_t)((uint64_t) p_c2h >> 32), (uint32_t)((uint64_t) p_c2h) );
     fpga_ctl->writeReg(200, (uint32_t) ((uint64_t) p_c2h >> 32));
     fpga_ctl->writeReg(201, (uint32_t) ((uint64_t) p_c2h));
     fpga_ctl->writeReg(202, length);
-    fpga_ctl->writeReg(203, offset);
     fpga_ctl->writeReg(205, total_words);
     fpga_ctl->writeReg(206, total_qs);
     fpga_ctl->writeReg(207, total_cmds);
-    uint32_t target_addr = 0x4000;
-    fpga_ctl->writeReg(214, target_addr);
 
     for(int i=0;i<1;i++){//one q in total
             fpga_ctl->writeConfig(0x1408/4,i);
@@ -141,44 +157,19 @@ void test_hbm_c2h(uint8_t pci_bus) {
 
     fmt::println("Card to Host finish setting !");
 
-    // // fpga_ctl->writeReg(222, 0);
-    // fpga_ctl->writeReg(223, 0);
-    // fpga_ctl->writeReg(222, 0xffffffff);     // start mini core
-    // sleep(5);
-    // fpga_ctl->writeReg(222, 0);
-    // sleep(10);
-
     fpga_ctl->writeReg(204, 0);
     fpga_ctl->writeReg(204, 1);
-    sleep(10);
+    sleep(5);
 
     fmt::println("Card to Host successfully!");
-
-    // unsigned int cycles = fpga_ctl->readReg(512+202);
-    // fmt::println("Cycles: 0x{:x}",cycles);
-    // double speed = 1.0*total_words*total_cmds/(1.0*cycles*4/1000/1000/1000)/1024/1024/1024;
-    // fmt::println("Speed: {:.5f} GB/s",speed);
-
     unsigned int cur_word = fpga_ctl->readReg(512+201);
     fmt::println("Cur_word: 0x{:x}",cur_word);
-    uint32_t * cpu_mem = (uint32_t *)p_c2h;
-    for (int i = 0; i < 32; i++) 
-        if (cpu_mem[i]!=0){
-        fmt::println("Memory 0x{} 0x{:x}", i, cpu_mem[i]);
-    }
-
-    /*
-    reg_status(300) := mini_core.io.rdma_print_addr
-	reg_status(301) := mini_core.io.rdma_print_string_num
-	reg_status(302) := mini_core.io.rdma_print_string_len
-	reg_status(303) := mini_core.io.rdma_trap
-    */
-    fmt::println("rdma_print_addr: 0x{:x}", fpga_ctl->readReg(512+300));
-    fmt::println("rdma_print_string_num: 0x{:x}", fpga_ctl->readReg(512+301));
-    fmt::println("rdma_print_string_len: 0x{:x}", fpga_ctl->readReg(512+302));
-    fmt::println("rdma_trap: 0x{:x}", fpga_ctl->readReg(512+303));
-
-
+    char * cpu_mem = (char *)p_c2h;
+    // fmt::print("{:s}", cpu_mem);
+    for (int i = 0; i < length; i++) 
+        // print char
+        fmt::print("{:c}", cpu_mem[i]);
+    fmt::println(" ");
     throughput_benchmark_print_counters_hbm(fpga_ctl);
     cpu_mem_ctl->free(dma_buff);
 }

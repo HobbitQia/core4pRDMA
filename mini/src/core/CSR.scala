@@ -357,33 +357,37 @@ class CSR(val xlen: Int) extends Module {
         .elsewhen(csr_addr === CSR.cyclehw) { cycleh := wdata }
         .elsewhen(csr_addr === CSR.timehw) { timeh := wdata }
         .elsewhen(csr_addr === CSR.instrethw) { instreth := wdata }
+        .elsewhen(csr_addr === CSR.rdma_print_addr) { rdma_print_addr := wdata }
+        .elsewhen(csr_addr === CSR.rdma_print_string_num) { rdma_print_string_num := wdata }
+        .elsewhen(csr_addr === CSR.rdma_print_string_len) { rdma_print_string_len := wdata }
+        .elsewhen(csr_addr === CSR.rdma_trap) { rdma_trap := wdata }
     }
   }
 
-  class ila_csr(seq:Seq[Data]) extends BaseILA(seq)
-    val inst_ila_csr = Module(new ila_csr(Seq(				
-      io.stall,
-      io.cmd,
-      io.in,
-      io.out,
-      io.pc,
-      io.addr,
-      io.inst,
-      io.illegal,
-      io.st_type,
-      io.ld_type,
-      io.pc_check,
-      io.expt,
-      io.evec,
-      io.epc,
-      mepc,
-      mcause,
-      mstatus,
+  // class ila_csr(seq:Seq[Data]) extends BaseILA(seq)
+  //   val inst_ila_csr = Module(new ila_csr(Seq(				
+  //     io.stall,
+  //     io.cmd,
+  //     io.in,
+  //     io.out,
+  //     io.pc,
+  //     io.addr,
+  //     io.inst,
+  //     io.illegal,
+  //     io.st_type,
+  //     io.ld_type,
+  //     io.pc_check,
+  //     io.expt,
+  //     io.evec,
+  //     io.epc,
+  //     mepc,
+  //     mcause,
+  //     mstatus,
 
-      rdma_print_addr,
-      rdma_print_string_num,
-      rdma_print_string_len,
-      rdma_trap,
-    )))
-    inst_ila_csr.connect(clock)
+  //     rdma_print_addr,
+  //     rdma_print_string_num,
+  //     rdma_print_string_len,
+  //     rdma_trap,
+  //   )))
+  //   inst_ila_csr.connect(clock)
 }

@@ -37,7 +37,7 @@ class MemArbiter(val xlen: Int, val nastiParams: NastiBundleParameters, val bram
   
     ibram.io <> io.ibram
     dbram.io.req <> io.dbram.req
-    dbram.io.abort := io.dbram.abort
+    // dbram.io.abort := io.dbram.abort 
     // dbram2.io.req <> io.dbram.req
     // dbram2.io.abort := io.dbram.abort
     // cache.io.cpu.req <> io.dbram.req
@@ -49,9 +49,11 @@ class MemArbiter(val xlen: Int, val nastiParams: NastiBundleParameters, val bram
     cache.io.nasti <> io.nasti
 
     val addr = io.dbram.req.bits.addr
-    val range_check = addr >= bramParams.staddr.U && addr < bramParams.edaddr.U
-    // val range_reg = RegInit(true.B) 
+    val debug_addr = addr < "x80004000".U
+    dontTouch(debug_addr)
+    val range_check = addr >= "x80004000".U && addr < bramParams.edaddr.U
     val range_reg = RegNext(range_check)
+    dbram.io.abort := io.dbram.abort || !range_check
     // when (io.dbram.req.valid) {
     //     range_reg := range_check
     // }
@@ -61,6 +63,7 @@ class MemArbiter(val xlen: Int, val nastiParams: NastiBundleParameters, val bram
     class ila_arb(seq:Seq[Data]) extends BaseILA(seq)
         val inst_ila_arb = Module(new ila_arb(Seq(				
         reset,
+        debug_addr,
         io.ibram.abort,
         io.dbram.abort,
         range_check,
@@ -159,5 +162,21 @@ class Bram(val InstBram: Boolean, val b: BramParameters, val nasti: NastiBundleP
         bram.io.data_in_a := io.req.bits.data
         io.resp.bits.data := bram.io.data_out_a
         io.resp.valid := true.B
+
+        class ila_bram(seq:Seq[Data]) extends BaseILA(seq)
+        val inst_ila_bram = Module(new ila_bram(Seq(
+            reset,
+            io.req.valid,
+            io.req.bits.addr,
+            io.req.bits.data,
+            io.req.bits.mask,
+            io.abort,
+            bram.io.data_out_a,
+            bram.io.addr_a,
+            bram.io.data_in_a,
+            bram.io.data_out_b,
+        )))
+
+        inst_ila_bram.connect(clock)
     }
 }

@@ -24,6 +24,14 @@ class DatapathIO(xlen: Int) extends Bundle {
   val rdma_print_string_num = Output(UInt(xlen.W))
   val rdma_print_string_len = Output(UInt(xlen.W))
   val rdma_trap = Output(UInt(xlen.W))
+  // RDMA Hardware
+  val has_event_wr	    = Input(Bool())   
+  val has_event_rd	    = Output(Bool())  
+  val event_recv_cnt	    = Output(UInt(xlen.W))
+  val event_processed_cnt	= Output(UInt(xlen.W))
+  val event_type	        = Output(UInt(xlen.W))
+  val user_csr_wr	    = Input(Vec(32,UInt(xlen.W)))
+	val user_csr_rd	    = Output(Vec(32,UInt(xlen.W)))
 }
 
 class FetchExecutePipelineRegister(xlen: Int) extends Bundle {
@@ -52,6 +60,13 @@ class Datapath(val conf: CoreConfig) extends Module {
   io.rdma_print_string_num := csr.io.rdma_print_string_num
   io.rdma_print_string_len := csr.io.rdma_print_string_len
   io.rdma_trap := csr.io.rdma_trap
+  io.has_event_wr <> csr.io.has_event_wr
+  io.has_event_rd <> csr.io.has_event_rd
+  io.event_recv_cnt <> csr.io.event_recv_cnt
+  io.event_processed_cnt <> csr.io.event_processed_cnt
+  io.event_type <> csr.io.event_type
+  io.user_csr_wr <> csr.io.user_csr_wr
+  io.user_csr_rd <> csr.io.user_csr_rd
 
   /** Pipeline State Registers * */
 

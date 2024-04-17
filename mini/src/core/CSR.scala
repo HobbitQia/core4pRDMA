@@ -63,6 +63,13 @@ object CSR {
   val rdma_print_string_num = 0xF1.U(12.W)
   val rdma_print_string_len = 0xF2.U(12.W)
   val rdma_trap = 0xF3.U(12.W)
+  
+  // 0x040-0x5F
+  // val meta_csr = "b000001??????".U(12.W)
+  val has_event = 0x070.U(12.W)
+  val event_recv_cnt = 0x071.U(12.W)
+  val event_processed_cnt = 0x072.U(12.W)
+  val event_type = 0x073.U(12.W)
 
   val regs = List(
     cycle,
@@ -98,7 +105,14 @@ object CSR {
     rdma_print_addr,
     rdma_print_string_num,
     rdma_print_string_len,
-    rdma_trap
+    rdma_trap,
+    // RDMA Hardware
+    // meta_csr,
+    has_event,
+    event_recv_cnt,
+    event_processed_cnt,
+    event_type
+
   )
 }
 
@@ -129,11 +143,19 @@ class CSRIO(xlen: Int) extends Bundle {
   val epc = Output(UInt(xlen.W))
   // HTIF
   val host = new HostIO(xlen)
-  // RDMA CSR
+  // RDMA CSR (for debug)
   val rdma_print_addr = Output(UInt(xlen.W))
   val rdma_print_string_num = Output(UInt(xlen.W))
   val rdma_print_string_len = Output(UInt(xlen.W))
   val rdma_trap = Output(UInt(xlen.W))
+  // interface between CSR & Hardware
+  val has_event_wr	    = Input(Bool())   
+  val has_event_rd	    = Output(Bool())  
+  val event_recv_cnt	    = Output(UInt(32.W))
+  val event_processed_cnt	= Output(UInt(32.W))
+  val event_type	        = Output(UInt(32.W))
+  val user_csr_wr	    = Input(Vec(32,UInt(32.W)))
+	val user_csr_rd	    = Output(Vec(32,UInt(32.W)))
 }
 
 class CSR(val xlen: Int) extends Module {
@@ -154,11 +176,31 @@ class CSR(val xlen: Int) extends Module {
   val rdma_print_string_num = RegInit(0.U(xlen.W))
   val rdma_print_string_len = RegInit(0.U(xlen.W))
   val rdma_trap = RegInit(0.U(xlen.W))
+  // RDMA Hardware
+  val meta_csr = RegInit(VecInit(Seq.fill(32)(0.U(xlen.W))))
+  val has_event = RegInit(false.B)
+  val event_recv_cnt = RegInit(0.U(xlen.W))
+  val event_processed_cnt = RegInit(0.U(xlen.W))
+  val event_type = RegInit(0.U(xlen.W))
+  val meta_offset = csr_addr(4, 0)
 
   io.rdma_print_addr := rdma_print_addr
   io.rdma_print_string_num := rdma_print_string_num
   io.rdma_print_string_len := rdma_print_string_len
   io.rdma_trap := rdma_trap
+
+  io.has_event_rd := has_event
+  io.event_recv_cnt := event_recv_cnt
+  io.event_processed_cnt := event_processed_cnt
+  io.event_type := event_type
+  io.user_csr_rd := meta_csr
+
+  // 判断是否和 Core 这边冲突
+  when(io.has_event_wr) {
+    has_event := true.B
+    event_recv_cnt := event_recv_cnt + 1.U
+    meta_csr := io.user_csr_wr
+  }
 
   val mcpuid = Cat(
     0.U(2.W) /* RV32I */,
@@ -255,8 +297,14 @@ class CSR(val xlen: Int) extends Module {
     BitPat(CSR.rdma_print_addr) -> rdma_print_addr,
     BitPat(CSR.rdma_print_string_num) -> rdma_print_string_num,
     BitPat(CSR.rdma_print_string_len) -> rdma_print_string_len,
-    BitPat(CSR.rdma_trap) -> rdma_trap
-
+    BitPat(CSR.rdma_trap) -> rdma_trap,
+    // RDMA Hardware
+    BitPat(CSR.has_event) -> has_event,
+    BitPat(CSR.event_recv_cnt) -> event_recv_cnt,
+    BitPat(CSR.event_processed_cnt) -> event_processed_cnt,
+    BitPat(CSR.event_type) -> event_type,
+    // 0x040-0x5F
+    BitPat("b0000010?????") -> meta_csr(meta_offset)
   )
 
   io.out := Lookup(csr_addr, 0.U, csrFile).asUInt
@@ -361,8 +409,14 @@ class CSR(val xlen: Int) extends Module {
         .elsewhen(csr_addr === CSR.rdma_print_string_num) { rdma_print_string_num := wdata }
         .elsewhen(csr_addr === CSR.rdma_print_string_len) { rdma_print_string_len := wdata }
         .elsewhen(csr_addr === CSR.rdma_trap) { rdma_trap := wdata }
+        .elsewhen(csr_addr === CSR.has_event) { has_event := wdata }
+        .elsewhen(csr_addr === CSR.event_recv_cnt) { event_recv_cnt := wdata }
+        .elsewhen(csr_addr === CSR.event_processed_cnt) { event_processed_cnt := wdata }
+        .elsewhen(csr_addr === CSR.event_type) { event_type := wdata }
+        .elsewhen(csr_addr === BitPat("b000001??????")) { meta_csr(meta_offset) := wdata }
     }
   }
+  
 
   // class ila_csr(seq:Seq[Data]) extends BaseILA(seq)
   //   val inst_ila_csr = Module(new ila_csr(Seq(				

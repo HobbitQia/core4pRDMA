@@ -49,58 +49,58 @@ class MemArbiter(val xlen: Int, val nastiParams: NastiBundleParameters, val bram
     cache.io.nasti <> io.nasti
 
     val addr = io.dbram.req.bits.addr
-    val debug_addr = addr < "x80004000".U
-    dontTouch(debug_addr)
+    // val debug_addr = addr < "x80004000".U
+    // dontTouch(debug_addr)
     val range_check = addr >= "x80004000".U && addr < bramParams.edaddr.U
     val range_reg = RegNext(range_check)
-    dbram.io.abort := io.dbram.abort || !range_check
+    dbram.io.abort := io.dbram.abort || addr < bramParams.edaddr.U
     // when (io.dbram.req.valid) {
     //     range_reg := range_check
     // }
 
     io.dbram.resp <> Mux(range_reg, dbram.io.resp, cache.io.cpu.resp)
 
-    class ila_arb(seq:Seq[Data]) extends BaseILA(seq)
-        val inst_ila_arb = Module(new ila_arb(Seq(				
-        reset,
-        debug_addr,
-        io.ibram.abort,
-        io.dbram.abort,
-        range_check,
-        range_reg,
-        io.ibram.req.valid,
-        io.ibram.req.bits.addr,
-        io.ibram.resp.bits.data,
-        io.dbram.req.bits.addr,
-        io.dbram.req.valid,
-        io.dbram.req.bits.data,
-        io.dbram.req.bits.mask,
-        io.dbram.resp.bits.data,
-        io.dbram.resp.valid,
+    // class ila_arb(seq:Seq[Data]) extends BaseILA(seq)
+    //     val inst_ila_arb = Module(new ila_arb(Seq(				
+    //     reset,
+    //     debug_addr,
+    //     io.ibram.abort,
+    //     io.dbram.abort,
+    //     range_check,
+    //     range_reg,
+    //     io.ibram.req.valid,
+    //     io.ibram.req.bits.addr,
+    //     io.ibram.resp.bits.data,
+    //     io.dbram.req.bits.addr,
+    //     io.dbram.req.valid,
+    //     io.dbram.req.bits.data,
+    //     io.dbram.req.bits.mask,
+    //     io.dbram.resp.bits.data,
+    //     io.dbram.resp.valid,
 
-        dbram.io.resp.bits.data,
-        dbram.io.resp.valid,
-        cache.io.cpu.resp.bits.data,
-        cache.io.cpu.resp.valid,
+    //     dbram.io.resp.bits.data,
+    //     dbram.io.resp.valid,
+    //     cache.io.cpu.resp.bits.data,
+    //     cache.io.cpu.resp.valid,
 
-        io.nasti.ar.bits.addr,
-        io.nasti.ar.valid,
-        io.nasti.ar.ready,
-        io.nasti.r.bits.data,
-        io.nasti.r.valid,
-        io.nasti.r.ready,
-        io.nasti.aw.bits.addr,
-        io.nasti.aw.valid,
-        io.nasti.aw.ready,
-        io.nasti.w.bits.data,
-        io.nasti.w.valid,
-        io.nasti.w.ready,
-        io.nasti.b.bits.resp,
-        io.nasti.b.valid,
-        io.nasti.b.ready,
+    //     io.nasti.ar.bits.addr,
+    //     io.nasti.ar.valid,
+    //     io.nasti.ar.ready,
+    //     io.nasti.r.bits.data,
+    //     io.nasti.r.valid,
+    //     io.nasti.r.ready,
+    //     io.nasti.aw.bits.addr,
+    //     io.nasti.aw.valid,
+    //     io.nasti.aw.ready,
+    //     io.nasti.w.bits.data,
+    //     io.nasti.w.valid,
+    //     io.nasti.w.ready,
+    //     io.nasti.b.bits.resp,
+    //     io.nasti.b.valid,
+    //     io.nasti.b.ready,
 
-        )))
-	  inst_ila_arb.connect(clock)
+    //     )))
+	//   inst_ila_arb.connect(clock)
 }
 
 class TileIO(xlen: Int, nastiParams: NastiBundleParameters) extends Bundle {
@@ -111,6 +111,14 @@ class TileIO(xlen: Int, nastiParams: NastiBundleParameters) extends Bundle {
     val rdma_print_string_num = Output(UInt(xlen.W))
     val rdma_print_string_len = Output(UInt(xlen.W))
     val rdma_trap = Output(UInt(xlen.W))
+    // RDMA Hardware
+    val has_event_wr	    = Input(Bool())   
+    val has_event_rd	    = Output(Bool())  
+    val event_recv_cnt	    = Output(UInt(32.W))
+    val event_processed_cnt	= Output(UInt(32.W))
+    val event_type	        = Output(UInt(32.W))
+    val user_csr_wr	    = Input(Vec(32,UInt(32.W)))
+	val user_csr_rd	    = Output(Vec(32,UInt(32.W)))
 }
 
 object Tile {
@@ -132,6 +140,13 @@ class Tile(val coreParams: CoreConfig, val nastiParams: NastiBundleParameters, v
     io.rdma_print_string_num := core.io.rdma_print_string_num
     io.rdma_print_string_len := core.io.rdma_print_string_len
     io.rdma_trap := core.io.rdma_trap
+    io.has_event_wr <> core.io.has_event_wr
+    io.has_event_rd <> core.io.has_event_rd
+    io.event_recv_cnt <> core.io.event_recv_cnt
+    io.event_processed_cnt <> core.io.event_processed_cnt
+    io.event_type <> core.io.event_type
+    io.user_csr_wr <> core.io.user_csr_wr
+    io.user_csr_rd <> core.io.user_csr_rd
 }
 
 // 处理 inst

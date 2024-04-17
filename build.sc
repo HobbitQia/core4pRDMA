@@ -90,32 +90,32 @@ object static extends ScalaModule{
 	override def mainClass = Some("static.elaborate")
 }
 
-object mini extends ScalaModule {
-      def scalaVersion = "2.13.7"
-      override def millSourcePath = os.pwd / "mini"
-      override def scalacOptions = Seq(
-      // "-Xsource:2.11",
-      "-language:reflectiveCalls",
-      "-deprecation",
-      "-feature",
-      "-Xcheckinit",
-      // "-P:chiselplugin:useBundlePlugin"
-    )
-    override def scalacPluginIvyDeps = Agg(
-		ivy"edu.berkeley.cs:::chisel3-plugin:3.5.1",
-    //   ivy"org.chipsalliance:::chisel-plugin:5.0.0",
-    )
-    override def ivyDeps = Agg(
-        // ivy"edu.berkeley.cs::chiseltest:5.0.2",
-        // ivy"org.chipsalliance::chisel:5.0.0"
-		ivy"edu.berkeley.cs::chisel3:3.5.1",
-    )
-	def moduleDeps = Seq(common)
-	override def mainClass = Some("mini.elaborate")
-}
+// object mini extends ScalaModule {
+//       def scalaVersion = "2.13.7"
+//       override def scalacOptions = Seq(
+//       // "-Xsource:2.11",
+//       "-language:reflectiveCalls",
+//       "-deprecation",
+//       "-feature",
+//       "-Xcheckinit",
+//       // "-P:chiselplugin:useBundlePlugin"
+//     )
+//     override def scalacPluginIvyDeps = Agg(
+// 		ivy"edu.berkeley.cs:::chisel3-plugin:3.5.1",
+//     //   ivy"org.chipsalliance:::chisel-plugin:5.0.0",
+//     )
+//     override def ivyDeps = Agg(
+//         // ivy"edu.berkeley.cs::chiseltest:5.0.2",
+//         // ivy"org.chipsalliance::chisel:5.0.0"
+// 		ivy"edu.berkeley.cs::chisel3:3.5.1",
+//     )
+// 	def moduleDeps = Seq(common)
+// 	override def mainClass = Some("mini.elaborate")
+// }
 
-object foo extends ScalaModule{
+object mini extends ScalaModule{
 	override def scalaVersion = "2.13.7"
+	override def millSourcePath = os.pwd / "core"
 	override def scalacOptions = Setting.scalacOptions
 	override def scalacPluginIvyDeps = Agg(
 	  ivy"edu.berkeley.cs:::chisel3-plugin:3.5.0",
@@ -125,6 +125,6 @@ object foo extends ScalaModule{
 		ivy"edu.berkeley.cs::chisel3:3.5.0",
 		
 	)
-	def moduleDeps = Seq(common, qdma, hbm, mini)
-	def mainClass = Some("foo.elaborate")
+	def moduleDeps = Seq(common, qdma, hbm)
+	def mainClass = Some("mini.elaborate")
 }

@@ -5,3 +5,4 @@
 /.vscode
 /gen
 config.json
+inst.*
